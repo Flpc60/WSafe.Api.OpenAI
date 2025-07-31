@@ -21,7 +21,6 @@ namespace WSafe.Api.OpenAI.Controllers
         {
             try
             {
-                var prompt = "";
                 var response = await _chatGpt.Ask($"Actúa como un asistente técnico amable y conciso para WSafe. {request.Prompt}");
 
                 return Ok(new ChatbotResponse
