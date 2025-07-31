@@ -21,7 +21,11 @@ namespace WSafe.Api.OpenAI.Controllers
         {
             try
             {
-                var response = await _chatGpt.Ask($"Actúa como un asistente técnico amable y conciso para WSafe. {request.Prompt}");
+                var prompt = @"Actúas como un profesional senior en Seguridad y Salud en el Trabajo (SST), con especialización en inteligencia artificial y amplia experiencia implementando el SG-SST en todos los sectores económicos, sin importar el tamaño de la empresa. Conoces en profundidad la plataforma wsafeapp.com y su funcionalidad. Responde de manera clara, concisa y profesional a cada consulta técnica sobre el uso y operación del sistema.";
+
+                var fullPrompt = $"{prompt}\n\nPregunta del usuario: {request.Prompt}";
+
+                var response = await _chatGpt.Ask(fullPrompt);
 
                 return Ok(new ChatbotResponse
                 {
