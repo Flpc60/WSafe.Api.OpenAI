@@ -1,0 +1,6 @@
+@WSafe.Api.OpenAI_HostAddress = http://localhost:5005
+
+GET {{WSafe.Api.OpenAI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

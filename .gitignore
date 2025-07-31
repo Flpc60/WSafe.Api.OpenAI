@@ -1,0 +1,52 @@
+# Build folders
+bin/
+obj/
+out/
+
+# Visual Studio temporary files
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vsp
+*.vsidx
+
+# Rider IDE
+.idea/
+
+# User-specific files
+*.swp
+*.sln.ide
+*.bak
+*.cache
+*.log
+
+# ASP.NET Core secrets and settings
+appsettings.json
+appsettings.Development.json
+appsettings.Production.json
+appsettings.*.json
+
+# Publish output
+wwwroot/dist/
+wwwroot/node_modules/
+
+# Node.js folders (if any front-end work is done)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Others
+*.db
+*.sqlite
+*.mdf
+*.ldf
+*.pdb
+*.DS_Store
+*.tgz
+
+# macOS / Linux
+*.DS_Store
+.env
