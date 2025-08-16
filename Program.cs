@@ -16,8 +16,6 @@ builder.Services.AddCors(options =>
                       });
 });
 
-// Configura tu clave de OpenAI desde appsettings.json o directamente aquí:
-
 // Forzar lectura del archivo appsettings ignorando env vars (si es necesario)
 //builder.Configuration.Sources.Clear();
 //builder.Configuration
