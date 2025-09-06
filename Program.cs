@@ -1,75 +1,55 @@
-using Microsoft.OpenApi.Models;
+ï»¿using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// ====== 1) SERVICES ======
-
-// Controllers
+// ===== Services =====
 builder.Services.AddControllers();
 
-// CORS (ajusta los orígenes a tu front real)
+// CORS abierto para pruebas (ajusta orÃ­genes luego)
 const string CorsPolicy = "WSafeCors";
 builder.Services.AddCors(o => o.AddPolicy(CorsPolicy, p =>
-{
-    p.WithOrigins(
-        "http://localhost:8080",   // si tu MVC 5 corre en HTTP
-        "https://localhost:44300"  // típico IIS Express MVC 5 en HTTPS
-                                   // "https://tu-dominio"    // prod (cuando lo tengas)
-    )
-    .AllowAnyHeader()
-    .AllowAnyMethod()
-    .AllowCredentials(); // si usas auth basada en cookies/session
-}));
+    p.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader()
+));
 
 // Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo
-    {
-        Title = "WSafe.Api.OpenAI",
-        Version = "v1",
-        Description = "Endpoints de soporte/LLM"
-    });
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "WSafe.Api.OpenAI", Version = "v1" });
 });
 
+// OpenAI API Key desde variable de entorno
+var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+if (string.IsNullOrWhiteSpace(apiKey))
+{
+    Console.ForegroundColor = ConsoleColor.Yellow;
+    Console.WriteLine("âš  OPENAI_API_KEY no configurada. /api/chatbot/support responderÃ¡ 503.");
+    Console.ResetColor();
+}
+
+// HttpClient tipado para OpenAI
+builder.Services.AddHttpClient("openai", client =>
+{
+    client.BaseAddress = new Uri("https://api.openai.com/v1/");
+    if (!string.IsNullOrWhiteSpace(apiKey))
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+});
+
+// ===== Pipeline =====
 var app = builder.Build();
 
-// ====== 2) MIDDLEWARE PIPELINE ======
+// Importante: en HTTP no redirijas a HTTPS
+// app.UseHttpsRedirection();
 
-// Swagger (útil en dev y también puedes dejarlo en prod si lo requieres)
+app.UseCors(CorsPolicy);
+
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
     c.SwaggerEndpoint("/swagger/v1/swagger.json", "WSafe.Api.OpenAI v1");
-});
-
-// CORS antes de auth/routing
-app.UseCors(CorsPolicy);
-
-// HTTPS redirection:
-// - Para pruebas con curl/HTTP puro, puedes comentar esta línea.
-// - En entornos formales, déjala activa.
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-// Preflight OPTIONS (algunos proxies requieren respuesta explícita)
-app.MapMethods("{*path}", new[] { "OPTIONS" }, (HttpContext ctx) =>
-{
-    // Devolver encabezados típicos de CORS
-    var origin = ctx.Request.Headers["Origin"].ToString();
-    if (!string.IsNullOrEmpty(origin))
-    {
-        ctx.Response.Headers["Access-Control-Allow-Origin"] = origin;
-        ctx.Response.Headers["Vary"] = "Origin";
-    }
-    ctx.Response.Headers["Access-Control-Allow-Credentials"] = "true";
-    ctx.Response.Headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization";
-    ctx.Response.Headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
-    return Results.Ok();
+    // c.RoutePrefix = string.Empty; // Descomenta si quieres Swagger en "/"
 });
 
 app.MapControllers();
-
 app.Run();

@@ -1,53 +1,71 @@
-﻿using ChatGPT.Net;
+﻿using System.Text;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
-using WSafe.Api.OpenAI.Models;
 
 namespace WSafe.Api.OpenAI.Controllers
 {
-    // Agente encargado de atender el soporte técnico
     [ApiController]
     [Route("api/[controller]")]
     public class ChatbotController : ControllerBase
     {
-        private readonly ChatGpt _chatGpt;
+        private readonly IHttpClientFactory _httpFactory;
+        private static readonly JsonSerializerOptions _json = new(JsonSerializerDefaults.Web);
 
-        public ChatbotController(ChatGpt chatGpt)
+        public ChatbotController(IHttpClientFactory httpFactory)
         {
-            _chatGpt = chatGpt;
+            _httpFactory = httpFactory;
         }
 
+        public class SupportRequest { public string Prompt { get; set; } }
+
         [HttpPost("support")]
-        public async Task<IActionResult> SupportAsync([FromBody] ChatbotRequest request)
+        public async Task<IActionResult> Support([FromBody] SupportRequest req)
         {
+            var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+            if (string.IsNullOrWhiteSpace(apiKey))
+                return StatusCode(503, new { success = false, error = "Service unavailable: OPENAI_API_KEY not set." });
+
+            if (req == null || string.IsNullOrWhiteSpace(req.Prompt))
+                return BadRequest(new { success = false, error = "Prompt requerido." });
+
+            var http = _httpFactory.CreateClient("openai");
+
+            // payload para /v1/chat/completions
+            var payload = new
+            {
+                model = "gpt-4o-mini",
+                messages = new[]
+                {
+                    new { role = "system", content = "Eres un asistente útil para WSafe." },
+                    new { role = "user", content = req.Prompt }
+                }
+            };
+
+            var content = new StringContent(JsonSerializer.Serialize(payload, _json), Encoding.UTF8, "application/json");
+            var resp = await http.PostAsync("chat/completions", content);
+            var json = await resp.Content.ReadAsStringAsync();
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                return StatusCode((int)resp.StatusCode, new { success = false, error = json });
+            }
+
+            // Extraer el texto: choices[0].message.content
             try
             {
-                var prompt = @"Actúas como un profesional senior en Seguridad y Salud en el Trabajo (SST), con especialización en inteligencia artificial y amplia experiencia implementando el SG-SST en todos los sectores económicos, sin importar el tamaño de la empresa. Conoces en profundidad la plataforma wsafeapp.com y su funcionalidad. Responde de manera clara, concisa y profesional a cada consulta técnica relacionada con el SG-SST Y sobre el uso y operación la plataforma WSafeApp. Responde solo consultas relacionadas con elSG-SST y la plataforma WSafeApp";
+                using var doc = JsonDocument.Parse(json);
+                var text = doc.RootElement
+                              .GetProperty("choices")[0]
+                              .GetProperty("message")
+                              .GetProperty("content")
+                              .GetString() ?? "";
 
-                var fullPrompt = $"{prompt}\n\nPregunta del usuario: {request.Prompt}";
-
-                var response = await _chatGpt.Ask(fullPrompt);
-
-                return Ok(new ChatbotResponse
-                {
-                    Response = response,
-                    Success = true
-                });
+                return Ok(new { success = true, response = text });
             }
-            catch (HttpRequestException ex) when (ex.Message.Contains("TooManyRequests"))
+            catch
             {
-                return StatusCode(429, new ChatbotResponse
-                {
-                    Success = false,
-                    ErrorMessage = "Has superado la cuota de uso de la API de OpenAI. Verifica tu plan y método de pago."
-                });
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ChatbotResponse
-                {
-                    Success = false,
-                    ErrorMessage = $"Error inesperado: {ex.Message}"
-                });
+                // Por si cambia el formato, devolvemos el json crudo
+                return Ok(new { success = true, response = json });
             }
         }
     }
